@@ -16,8 +16,8 @@ float SPEED_MAX =  1.0;
 
 // Servo variables
 const int stepSize = 5;
-const int minAngle = 80;
-const int maxAngle = 130;
+const int minAngle = 40;
+const int maxAngle = 120;
 int angle = (minAngle + maxAngle) / 2;  // Start at center position
 
 void setup() {
