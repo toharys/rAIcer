@@ -1,11 +1,22 @@
 import serial
+import glob
+import os
 from evdev import InputDevice, categorize, ecodes
 
 # Path to keyboard input event
 KEYBOARD_PATH = "/dev/input/event2"  # Adjust based on `cat /proc/bus/input/devices`
 
 # Path to Arduino USB port
-ARDUINO_PORT = "/dev/ttyUSB0"  # Check using `ls /dev/serial/by-id/`
+#ARDUINO_PORT = "/dev/ttyUSB0"  # Check using `ls /dev/serial/by-id/`
+serial_ports = glob.glob('/dev/serial/by-id/*')
+
+if len(serial_ports) == 0:
+    raise Exception("No serial device found. Check the connection.")
+
+# Resolve the symbolic link to get the actual port path
+ARDUINO_PORT = os.path.realpath(serial_ports[0])
+
+print(f"Using Arduino port: {ARDUINO_PORT}")
 BAUD_RATE = 9600
 
 # Connect to Arduino
@@ -61,3 +72,4 @@ for event in keyboard.read_loop():
         elif key_event.keycode == "KEY_SPACE":
             print("Sending: x (Stop)")
             ser.write(b'x')  # Send 'x' to Arduino
+
