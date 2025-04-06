@@ -18,46 +18,49 @@
 
 ## 👥 The Team 
 **Team Members**
-- [Member 1](name@emial.com)
-- [Member 2](name@emial.com)
+- [Tohar Simchi](toharya.simchi@mail.huji.ac.il )
+- [Adar Mizrahi](adar.mizrahi1@mail.huji.ac.il)
 
 **Supervisor**
-- [Supervisor](wwww.link_to_lab.com)
+- [Dr. Oron Sabag](Oron.Sabag@mail.huji.ac.il )
 
 
 ## 📚 Project Description
-- A brief description of the project/challange, what it does, and how it works.
-- A list of the main features and functionalities of the project.
-- A list of the main components of the project.
-- A list of the main technologies used in the project.
-
+rAIcer is a project that explores the challenges of autonomous navigation using two robot cars controlled via reinforcement learning (RL). These simplified vehicles are designed to operate in a controlled physical environment and a also have a simulation setup.
 
 ## ⚡ Getting Started
 
-These instructions will give you a copy of the project up and running on
-your local machine for development and testing purposes. 
+These instructions will help you get a copy of the rAIcer project running on your local development machine and Jetson Nano for both simulation and real-world testing.
 
 ### 🧱 Prerequisites
-Requirements for the software and other tools to build, test and push 
-- [Example 1](https://www.example.com)
-- [Example 2](https://www.example.com)
+- [Jetson Nano Nvidia](https://www.waveshare.com/jetson-nano-developer-kit.htm)
+- [Arduino IDE](https://docs.arduino.cc/hardware/)
+- [Python 3.10](https://www.python.org/downloads/release/python-3100/)
+- [DC motor](https://electronics.stackexchange.com/questions/263771/specification-of-dc-motor)
+- [Servo motor](https://circuitdigest.com/article/servo-motor-working-and-basics)
+- [Camera](https://www.intelrealsense.com/)
+- Serial connection (USB) between Jetson Nano and Arduino
 
 ### 🏗️ Installing
-A step by step series of examples that tell you how to get a development environment running
-
-Say what the step will be
-
-    Give the example
-
-And repeat
-
-    until finished
-
-End with an example of getting some data out of the system or using it
-for a little demo
+1. The simmulation - https://colab.research.google.com/drive/1OWp7wlhXpLPeueP0ZxFYp-6bc4MzQKhR
+2. Clone the repository
+   """
+    git clone https://github.com/toharys/rAIcer.git
+    cd rAIcer
+   """
+3. activate virtual environment in the jetson
+    """
+   cd  home/raicer/move_robot/rAIcer
+   source ~/.py3venv/bin/activate
+   """
+4. running scripts
+   """
+   on the jetson: python communicate_with_controller.py
+   on the arduino, downlode: full_controller.ino
+   """
 
 ## 🧪 Testing
-Explain how to run tests for this project
+To verify the functionality of the project and the learning algorithm, use the following testing approach:
 
 ### Sample Tests
 Explain what these tests test and why
@@ -65,15 +68,16 @@ Explain what these tests test and why
     Give an example
 
 ## 🚀 Deployment
-Add additional notes on how to deploy this on a live system
+Agent Performance – test that the agent improves over time in simulation.
+
+Motor Command Accuracy – verify that the correct commands are sent from Jetson to Arduino.
 
 ## ⚙️ Built With
-  - [Based on the amazing work of reserch group xxxx](https://www.example.com)
-  - [Contributor Covenant](https://www.contributor-covenant.org/) - Used for the Code of Conduct
-  - [Creative Commons](https://creativecommons.org/) - Used to choose the license
-
+  - [the RL algoritem is based on an artical about DQN ](https://arxiv.org/pdf/1312.5602)
 
 ## 🙏 Acknowledgments
-  - Hat tip to anyone whose code is used
-  - Inspiration
-  - etc
+Inspired by Mnih et al.'s Deep Q-Learning work
+
+Thanks to our supervisor Dr. Oron Sabag for guidance
+
+Thanks to Yedidiya and Maor for hardware and electronics help
