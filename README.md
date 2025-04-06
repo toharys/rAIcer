@@ -44,33 +44,41 @@ These instructions will help you get a copy of the rAIcer project running on you
 ### 🏗️ Installing
 1. The simmulation - https://colab.research.google.com/drive/1OWp7wlhXpLPeueP0ZxFYp-6bc4MzQKhR
 2. Clone the repository
-   """
+   
     git clone https://github.com/toharys/rAIcer.git
     cd rAIcer
-   """
+
 3. activate virtual environment in the jetson
-    """
+ 
    cd  home/raicer/move_robot/rAIcer
    source ~/.py3venv/bin/activate
-   """
+
 4. running scripts
-   """
+
    on the jetson: python communicate_with_controller.py
    on the arduino, downlode: full_controller.ino
-   """
+
 
 ## 🧪 Testing
 To verify the functionality of the project and the learning algorithm, use the following testing approach:
 
 ### Sample Tests
-Explain what these tests test and why
-
-    Give an example
-
-## 🚀 Deployment
 Agent Performance – test that the agent improves over time in simulation.
 
 Motor Command Accuracy – verify that the correct commands are sent from Jetson to Arduino.
+
+## 🚀 Deployment
+To deploy on the physical robot:
+
+1.Set up the Jetson Nano with camera and power.
+
+2.Flash the Arduino with the latest motor control script.
+
+3.From the Jetson Nano, run the robot execution script:
+
+   python communicate_with_controller.py
+
+4. Make sure the robot has a clear field of view and is properly aligned with the road.
 
 ## ⚙️ Built With
   - [the RL algoritem is based on an artical about DQN ](https://arxiv.org/pdf/1312.5602)
