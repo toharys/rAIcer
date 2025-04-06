@@ -45,18 +45,18 @@ These instructions will help you get a copy of the rAIcer project running on you
 1. The simmulation - https://colab.research.google.com/drive/1OWp7wlhXpLPeueP0ZxFYp-6bc4MzQKhR
 2. Clone the repository
    
-    git clone https://github.com/toharys/rAIcer.git
-    cd rAIcer
+       git clone https://github.com/toharys/rAIcer.git
+       cd rAIcer
 
 3. activate virtual environment in the jetson
  
-   cd  home/raicer/move_robot/rAIcer
-   source ~/.py3venv/bin/activate
+      cd  home/raicer/move_robot/rAIcer
+      source ~/.py3venv/bin/activate
 
 4. running scripts
 
-   on the jetson: python communicate_with_controller.py
-   on the arduino, downlode: full_controller.ino
+      on the jetson: python communicate_with_controller.py
+      on the arduino, downlode: full_controller.ino
 
 
 ## 🧪 Testing
@@ -76,7 +76,7 @@ To deploy on the physical robot:
 
 3.From the Jetson Nano, run the robot execution script:
 
-   python communicate_with_controller.py
+      python communicate_with_controller.py
 
 4. Make sure the robot has a clear field of view and is properly aligned with the road.
 
