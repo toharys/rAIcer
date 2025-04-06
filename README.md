@@ -1,8 +1,8 @@
 # 💡 rAIcer
 
+
 <!-- cool project cover image -->
-![Project Cover Image](![image](https://github.com/user-attachments/assets/3599312c-b8c4-47bb-8969-af83aa75ed67)
-)
+![Project Cover Image](rAIcer_img.jpg)
 
 <!-- table of content -->
 ## Table of Contents
