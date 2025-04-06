@@ -51,11 +51,13 @@ These instructions will help you get a copy of the rAIcer project running on you
 3. activate virtual environment in the jetson
  
       cd  home/raicer/move_robot/rAIcer
+   
       source ~/.py3venv/bin/activate
 
-4. running scripts
+5. running scripts
 
       on the jetson: python communicate_with_controller.py
+   
       on the arduino, downlode: full_controller.ino
 
 
