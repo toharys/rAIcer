@@ -24,17 +24,15 @@ class Robot:
     def __init__(self):
 
         self.keymap = {
-            "KEY_RIGHT": b'w',
-            "KEY_LEFT": b's',
-            "KEY_UP": b'u',
-            "KEY_DOWN": b'b',
-            "KEY_SPACE": b'x'
-        }
+            Action.RIGHT: b'w',
+            Action.LEFT: b's',
+            Action.FORWARD: b'u',
+            Action.BACKWARD: b'b',
+            Action.STOP: b'x'
+        }       
 
         self.connect_to_arduino()
-        
-        self.connect_to_keyboard()
-        
+                
         self.camera_ready = False
         self.initialize_camera()
         
@@ -216,9 +214,8 @@ class Robot:
                             print(f"Arduino: {data}")
             except Exception as e:
                 print(f"Error reading from Arduino: {e}")
-
         
-    def start_control(self):
+    def control_with_keyboard(self):
         """Listen for keyboard inputs and send commands to the Arduino"""
         print("Starting keyboard control. Use arrow keys and space to control the robot.")
         
@@ -233,7 +230,15 @@ class Robot:
                         self.ser.write(self.keymap[keycode])
                         print(f"Sending: {self.keymap[keycode].decode()} ({keycode})")
 
-    
+    def control_action(self, action):
+        """Get action and send commands to the Arduino"""        
+        
+        # Send command to Arduino based on the action
+        if action in self.keymap:
+            with self.serial_lock:
+                self.ser.write(self.keymap[action])
+                print(f"Sending: {self.keymap[action].decode()} ({action})")
+
     def close(self):
         """Clean up resources"""
         if hasattr(self, 'ser'):
@@ -251,7 +256,7 @@ class Robot:
     
 #     # Start control
 #     try:
-#         robot.start_control()
+#         robot.control_action(Action.LEFT)
 #     except KeyboardInterrupt:
 #         print("\nExiting program")
 #     finally:
