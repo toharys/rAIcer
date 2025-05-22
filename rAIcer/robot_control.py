@@ -1,6 +1,7 @@
 import serial
 import glob
 import os
+import sys
 import threading
 import numpy as np
 import cv2
@@ -64,6 +65,11 @@ class FrameStack:
 
 class Robot:
     def __init__(self):
+         # Add the required path to PYTHONPATH programmatically
+        path_to_add = os.path.expanduser("~/move_robot/rAIcer/librealsense/build/Release")
+        if path_to_add not in sys.path:
+            sys.path.append(path_to_add)
+        os.environ["PYTHONPATH"] = os.environ.get("PYTHONPATH", "") + ":" + path_to_add
 
         self.keymap = {
             Action.RIGHT: b'w',
