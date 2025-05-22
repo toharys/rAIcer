@@ -57,21 +57,15 @@ void loop() {
     }
     myServo.write(angle);
     
-    // Send servo position update
-    Serial.print("Servo angle: ");
-    Serial.println(angle);
 
     // Motor control
     if (command == 'u') { // Move forward
-      Serial.println("Motor moving forward");
       moveMotor(1.0);
     } 
     else if (command == 'b') { // Move backward
-      Serial.println("Motor moving backward");
       moveMotor(-1.0);
     } 
     else if (command == 'x') { // Stop motor
-      Serial.println("Motor stopped");
       stopMotor();
     }
     
@@ -94,5 +88,8 @@ void moveMotor(float speed) {
 }
 
 void stopMotor() {
+  // Stop motor by setting pins LOW
+  digitalWrite(AIN1, LOW);
+  digitalWrite(AIN2, LOW);
   analogWrite(PWMA, 0);
 }
