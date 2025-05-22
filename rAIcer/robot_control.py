@@ -8,6 +8,7 @@ import torch
 import pyrealsense2 as rs
 from enum import Enum
 from evdev import InputDevice, categorize, ecodes
+from collections import deque
 
 # Path to keyboard input event
 KEYBOARD_PATH = "/dev/input/event2"  # Adjust based on `cat /proc/bus/input/devices`
@@ -19,6 +20,47 @@ class Action(Enum):
     RIGHT = 2
     FORWARD = 3
     BACKWARD = 4
+
+
+class FrameStack:
+    def __init__(self, k):
+        self.k = k
+        self.frames = deque([], maxlen=k)
+
+    def reset(self, frame_tensor):
+        """
+        Initialize the deque with k copies of the same frame.
+        Args:
+            frame_tensor (torch.Tensor): shape [1, 1, H, W]
+        Returns:
+            torch.Tensor: stacked frames with shape [1, k, H, W]
+        """
+        # Remove batch dim for storage: [1, 1, H, W] -> [1, H, W]
+        single_frame = frame_tensor.squeeze(0)  # shape: [1, H, W]
+        self.frames = deque([single_frame.clone() for _ in range(self.k)], maxlen=self.k)
+        return self._get_stacked()
+
+    def step(self, frame_tensor):
+        """
+        Add a new frame and return stacked frames.
+        Args:
+            frame_tensor (torch.Tensor): shape [1, 1, H, W]
+        Returns:
+            torch.Tensor: stacked frames with shape [1, k, H, W]
+        """
+        single_frame = frame_tensor.squeeze(0)  # shape: [1, H, W]
+        self.frames.append(single_frame.clone())
+        return self._get_stacked()
+
+    def _get_stacked(self):
+        """
+        Stack stored frames along the channel dimension.
+        Returns:
+            torch.Tensor: shape [1, k, H, W]
+        """
+        # Stack along the channel dimension (dim=0), then add batch dim
+        stacked = torch.cat(list(self.frames), dim=0)  # [k, H, W]
+        return stacked.unsqueeze(0)  # [1, k, H, W]
 
 class Robot:
     def __init__(self):
@@ -261,3 +303,12 @@ class Robot:
 #         print("\nExiting program")
 #     finally:
 #         robot.close()
+
+
+
+# robot = Robot()
+# fs = FrameStack(k=4)
+
+# # Reset with initial frame
+# initial_frame = robot.get_grayscale_frame()
+# stacked = fs.reset(initial_frame)
