@@ -10,24 +10,21 @@ import numpy as np
 import cv2
 import time
 from collections import deque
-import h5py  # For efficient disk-based storage
+import h5py
 
 # Configuration
 KEYBOARD_PATH = "/dev/input/event2"
 ARDUINO_PORTS = glob.glob('/dev/serial/by-id/*')
 FRAME_TYPE = 'grayscale'  # 'grayscale', 'depth', or 'color'
 STACK_SIZE = 4
-SAVE_FILENAME = "frame_stacks_with_commands.h5"  # Changed to HDF5 format
+SAVE_FILENAME = "frame_stacks_with_commands.h5"
 TERMINATE = False
-SAVE_INTERVAL = 100  # Save every 100 samples to disk
+SAVE_INTERVAL = 100
 
 def find_keyboard_device():
     """Find the keyboard input device dynamically"""
-    # Common keyboard identifiers - you may need to add more
     keyboard_names = ['keyboard', 'usb keyboard', 'logitech keyboard']
-   
-    # Check all input devices
-    input_devices = [f"/dev/input/event{i}" for i in range(32)]  # Check up to event32
+    input_devices = [f"/dev/input/event{i}" for i in range(32)]
    
     for device_path in input_devices:
         try:
@@ -39,7 +36,7 @@ def find_keyboard_device():
         except:
             continue
    
-    raise Exception("No keyboard device found. Check if keyboard is connected.")
+    raise Exception("No keyboard device found.")
 
 class FrameStack:
     def __init__(self, k=4):
@@ -91,7 +88,6 @@ class DataRecorder:
             exit(1)
 
         try:
-            #keyboard_path = find_keyboard_device()
             self.keyboard = InputDevice(KEYBOARD_PATH)
             print(f"Listening to keyboard: {self.keyboard.name}")
         except Exception as e:
@@ -105,37 +101,34 @@ class DataRecorder:
         self.pipeline.start(self.config)
 
     def initialize_storage(self):
-        """Initialize HDF5 file for storage"""
+        """Initialize HDF5 file with proper shapes"""
         self.h5_file = h5py.File(SAVE_FILENAME, 'w')
         
-        # Get frame shape (adjust based on your frame type)
         if FRAME_TYPE == 'color':
             frame_shape = (480, 640, 3)
         else:  # grayscale or depth
             frame_shape = (480, 640)
         
-        # Create resizable datasets
         self.stacks_dataset = self.h5_file.create_dataset(
             'stacks', 
             shape=(0, STACK_SIZE, *frame_shape),
             maxshape=(None, STACK_SIZE, *frame_shape),
-            chunks=(SAVE_INTERVAL, STACK_SIZE, *frame_shape),
+            chunks=(1, STACK_SIZE, *frame_shape),
             dtype=np.uint8
         )
         
-        # For older h5py versions, we'll store actions as fixed-length ASCII strings
         self.actions_dataset = self.h5_file.create_dataset(
             'actions',
             shape=(0,),
             maxshape=(None,),
-            dtype='S10'  # Fixed-length string type (10 characters max)
+            dtype='S10'
         )
         
         self.next_frames_dataset = self.h5_file.create_dataset(
             'next_frames',
             shape=(0, STACK_SIZE, *frame_shape),
             maxshape=(None, STACK_SIZE, *frame_shape),
-            chunks=(SAVE_INTERVAL, STACK_SIZE, *frame_shape),
+            chunks=(1, STACK_SIZE, *frame_shape),
             dtype=np.uint8
         )
 
@@ -158,26 +151,16 @@ class DataRecorder:
         else:
             raise ValueError("Invalid frame type")
 
-
-    def frame_processing(frame):
-        """
-    Processes a frame (grayscale, depth, or color) by applying adaptive thresholding and contour detection.
-    Works with frames from the RealSense camera as processed in your original code.
-
-    :param frame: Numpy array of shape [H, W] for grayscale/depth or [H, W, 3] for color
-    :return: contours detected in the frame
-        """
-        # Convert color frames to grayscale if needed
-        if len(frame.shape) == 3 and frame.shape[2] == 3:  # Color frame
+    def frame_processing_bw(self, frame):
+        """Process frame with contour detection and return processed frame"""
+        if len(frame.shape) == 3 and frame.shape[2] == 3:
             frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        else:  # Already grayscale or depth
+        else:
             frame_gray = frame
         
-        # Ensure the image is 8-bit (0-255) for thresholding
         if frame_gray.dtype != np.uint8:
             frame_gray = cv2.normalize(frame_gray, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
         
-        # Apply adaptive thresholding
         thresh = cv2.adaptiveThreshold(
             frame_gray, 
             255, 
@@ -187,46 +170,21 @@ class DataRecorder:
             2
         )
         
-        # Find contours
-        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        # Contour detection (optional visualization)
+        thresh_copy = thresh.copy()
+        result = cv2.findContours(thresh_copy, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        contours = result[0] if len(result) == 2 else result[1]
         
-        return contours
-
-#    def handle_keyboard(self):
-#        """Monitor keyboard and update current action"""
-#        global TERMINATE
-#        try:
-#            for event in self.keyboard.read_loop():
-#                if event.type == ecodes.EV_KEY and event.value == 1:
-#                    key = categorize(event).keycode
-#                   
-#                    if key == "KEY_RIGHT":
-#                        self.current_action = 'right'
-#                        self.ser.write(b'w')
-#                    elif key == "KEY_LEFT":
-#                        self.current_action = 'left'
-#                        self.ser.write(b's')
-#                    elif key == "KEY_UP":
-#                        self.current_action = 'forward'
-#                        self.ser.write(b'u')
-#                        time.sleep(1)
-#                        self.ser.write(b'x')
-#                    elif key == "KEY_DOWN":
-#                        self.current_action = 'backward'
-#                        self.ser.write(b'b')
-#                        time.sleep(1)
-#                        self.ser.write(b'x')
-#                    elif key == "KEY_SPACE":
-#                        self.current_action = 'stop'
-#                        self.ser.write(b'x')
-#                    elif key == "KEY_Q":
-#                        TERMINATE = True
-#        except Exception as e:
-#            print(f"Keyboard thread error: {e}")
-
+        # Return processed frame (with or without contours)
+        if FRAME_TYPE == 'color':
+            output = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
+            cv2.drawContours(output, contours, -1, (0, 255, 0), 1)
+            return output
+        else:
+            return thresh
 
     def handle_keyboard(self):
-        """Monitor keyboard and update current action based on key pressrelease"""
+        """Monitor keyboard and update current action"""
         global TERMINATE
         pressed_keys = set()
         
@@ -249,100 +207,100 @@ class DataRecorder:
                             action, cmd = key_map[key]
                             self.current_action = action
                             self.ser.write(cmd)
-                        
                         elif key == "KEY_Q":
                             TERMINATE = True
-                        
                     elif event.value == 0:  # Key release
                         if key in pressed_keys:
                             pressed_keys.remove(key)
-                            
                         if not pressed_keys:
                             self.current_action = 'stop'
                             self.ser.write(b'x')
                         else:
-                            # Keep the last active key's action
                             last_key = list(pressed_keys)[-1]
                             action, cmd = key_map[last_key]
                             self.current_action = action
                             self.ser.write(cmd)
-                            
         except Exception as e:
             print(f"Keyboard thread error: {e}")
 
     def save_to_disk(self, stacked_frames, action, next_frames):
-        """Save data to HDF5 file incrementally"""
-        # Resize datasets
+        """Save data with proper shape handling"""
+        if len(stacked_frames.shape) == 3:
+            stacked_frames = np.expand_dims(stacked_frames, axis=0)
+        if len(next_frames.shape) == 3:
+            next_frames = np.expand_dims(next_frames, axis=0)
+        
         new_size = self.sample_count + 1
         self.stacks_dataset.resize(new_size, axis=0)
         self.actions_dataset.resize(new_size, axis=0)
         self.next_frames_dataset.resize(new_size, axis=0)
         
-        # Add data
         self.stacks_dataset[self.sample_count] = stacked_frames
-        self.actions_dataset[self.sample_count] = np.string_(action)  # Convert to bytes
+        self.actions_dataset[self.sample_count] = np.string_(action)
         self.next_frames_dataset[self.sample_count] = next_frames
         
         self.sample_count += 1
         
-        # Flush periodically
         if self.sample_count % SAVE_INTERVAL == 0:
             self.h5_file.flush()
 
     def capture_data(self, duration=60):
-        """Main capture loop"""
+        """Main capture loop with proper frame handling"""
         keyboard_thread = threading.Thread(target=self.handle_keyboard, daemon=True)
         keyboard_thread.start()
-       
+        
         # Initialize with first frame
         global TERMINATE
         frames = self.pipeline.wait_for_frames()
-        first_frame = self.frame_processing(self.process_frame(frames))
-        if first_frame is None:
-            raise ValueError("Camera initialization failed")
-        self.frame_stack.reset(first_frame)
-       
+        first_frame = None
+        while first_frame is None and not TERMINATE:
+            frames = self.pipeline.wait_for_frames()
+            processed = self.process_frame(frames)
+            if processed is not None:
+                first_frame = self.frame_processing_bw(processed)
+        
+        if TERMINATE:
+            return
+        
+        # Initialize frame stack
+        stacked_frames = self.frame_stack.reset(first_frame)
+        prev_stacked_frames = None
+        
         start_time = time.time()
         print(f"Recording for {duration} seconds... (Press 'q' to stop early)")
-       
+        
         try:
-            prev_stacked_frames = None
-           
-            while not TERMINATE:
+            while not TERMINATE and (time.time() - start_time < duration):
                 frames = self.pipeline.wait_for_frames()
-                current_frame = self.frame_processing(self.process_frame(frames))
-               
-                if current_frame is None:
+                processed = self.process_frame(frames)
+                
+                if processed is None:
                     continue
-               
-                # Get frame stack
+                    
+                current_frame = self.frame_processing_bw(processed)
                 stacked_frames = self.frame_stack.step(current_frame)
-               
-                # Save previous frame with its action and current frame as next state
+                
                 if prev_stacked_frames is not None:
                     self.save_to_disk(prev_stacked_frames, self.current_action, stacked_frames)
-               
+                
                 prev_stacked_frames = stacked_frames.copy()
-               
-                # Display
+                
                 cv2.imshow('Current Frame', current_frame)
                 if cv2.waitKey(1) & 0xFF == ord('q'):
                     TERMINATE = True
                     break
-               
-                # Reset to stop if no recent keypress
-                if time.time() - start_time > 0.5:  # 0.5s timeout
-                    self.current_action = 'stop'
-               
-                time.sleep(0.5)  # Control frame rate
-            self.h5_file.flush()
+                
+                time.sleep(0.05)
+                
         finally:
             self.pipeline.stop()
             cv2.destroyAllWindows()
-            self.ser.close()
-            self.h5_file.close()
+            if self.ser:
+                self.ser.close()
+            if self.h5_file:
+                self.h5_file.close()
             print(f"Recording complete. Saved {self.sample_count} samples")
 
 if __name__ == "__main__":
     recorder = DataRecorder()
-    recorder.capture_data(duration=60)  # Record for 60 seconds
+    recorder.capture_data(duration=60)
