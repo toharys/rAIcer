@@ -13,11 +13,11 @@ from collections import deque
 import h5py  # For efficient disk-based storage
 
 # Configuration
-KEYBOARD_PATH = "/dev/input/event3"
+KEYBOARD_PATH = "/dev/input/event2"
 ARDUINO_PORTS = glob.glob('/dev/serial/by-id/*')
 FRAME_TYPE = 'grayscale'  # 'grayscale', 'depth', or 'color'
 STACK_SIZE = 4
-SAVE_FILENAME = "time_0.05_frame_stacks_with_commands.h5"  # Changed to HDF5 format
+SAVE_FILENAME = "frame_stacks_with_commands.h5"  # Changed to HDF5 format
 TERMINATE = False
 SAVE_INTERVAL = 100  # Save every 100 samples to disk
 
@@ -158,35 +158,115 @@ class DataRecorder:
         else:
             raise ValueError("Invalid frame type")
 
+
+    def frame_processing(frame):
+        """
+    Processes a frame (grayscale, depth, or color) by applying adaptive thresholding and contour detection.
+    Works with frames from the RealSense camera as processed in your original code.
+
+    :param frame: Numpy array of shape [H, W] for grayscale/depth or [H, W, 3] for color
+    :return: contours detected in the frame
+        """
+        # Convert color frames to grayscale if needed
+        if len(frame.shape) == 3 and frame.shape[2] == 3:  # Color frame
+            frame_gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        else:  # Already grayscale or depth
+            frame_gray = frame
+        
+        # Ensure the image is 8-bit (0-255) for thresholding
+        if frame_gray.dtype != np.uint8:
+            frame_gray = cv2.normalize(frame_gray, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
+        
+        # Apply adaptive thresholding
+        thresh = cv2.adaptiveThreshold(
+            frame_gray, 
+            255, 
+            cv2.ADAPTIVE_THRESH_GAUSSIAN_C, 
+            cv2.THRESH_BINARY_INV, 
+            11, 
+            2
+        )
+        
+        # Find contours
+        contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        
+        return contours
+
+#    def handle_keyboard(self):
+#        """Monitor keyboard and update current action"""
+#        global TERMINATE
+#        try:
+#            for event in self.keyboard.read_loop():
+#                if event.type == ecodes.EV_KEY and event.value == 1:
+#                    key = categorize(event).keycode
+#                   
+#                    if key == "KEY_RIGHT":
+#                        self.current_action = 'right'
+#                        self.ser.write(b'w')
+#                    elif key == "KEY_LEFT":
+#                        self.current_action = 'left'
+#                        self.ser.write(b's')
+#                    elif key == "KEY_UP":
+#                        self.current_action = 'forward'
+#                        self.ser.write(b'u')
+#                        time.sleep(1)
+#                        self.ser.write(b'x')
+#                    elif key == "KEY_DOWN":
+#                        self.current_action = 'backward'
+#                        self.ser.write(b'b')
+#                        time.sleep(1)
+#                        self.ser.write(b'x')
+#                    elif key == "KEY_SPACE":
+#                        self.current_action = 'stop'
+#                        self.ser.write(b'x')
+#                    elif key == "KEY_Q":
+#                        TERMINATE = True
+#        except Exception as e:
+#            print(f"Keyboard thread error: {e}")
+
+
     def handle_keyboard(self):
-        """Monitor keyboard and update current action"""
+        """Monitor keyboard and update current action based on key pressrelease"""
         global TERMINATE
+        pressed_keys = set()
+        
+        key_map = {
+            "KEY_RIGHT": ('right', b'w'),
+            "KEY_LEFT": ('left', b's'),
+            "KEY_UP": ('forward', b'u'),
+            "KEY_DOWN": ('backward', b'b'),
+            "KEY_SPACE": ('stop', b'x'),
+        }
+        
         try:
             for event in self.keyboard.read_loop():
-                if event.type == ecodes.EV_KEY and event.value == 1:
+                if event.type == ecodes.EV_KEY:
                     key = categorize(event).keycode
-                   
-                    if key == "KEY_RIGHT":
-                        self.current_action = 'right'
-                        self.ser.write(b'w')
-                    elif key == "KEY_LEFT":
-                        self.current_action = 'left'
-                        self.ser.write(b's')
-                    elif key == "KEY_UP":
-                        self.current_action = 'forward'
-                        self.ser.write(b'u')
-                        time.sleep(0.1)
-                        self.ser.write(b'x')
-                    elif key == "KEY_DOWN":
-                        self.current_action = 'backward'
-                        self.ser.write(b'b')
-                        time.sleep(0.1)
-                        self.ser.write(b'x')
-                    elif key == "KEY_SPACE":
-                        self.current_action = 'stop'
-                        self.ser.write(b'x')
-                    elif key == "KEY_Q":
-                        TERMINATE = True
+                    
+                    if event.value == 1:  # Key press
+                        if key in key_map:
+                            pressed_keys.add(key)
+                            action, cmd = key_map[key]
+                            self.current_action = action
+                            self.ser.write(cmd)
+                        
+                        elif key == "KEY_Q":
+                            TERMINATE = True
+                        
+                    elif event.value == 0:  # Key release
+                        if key in pressed_keys:
+                            pressed_keys.remove(key)
+                            
+                        if not pressed_keys:
+                            self.current_action = 'stop'
+                            self.ser.write(b'x')
+                        else:
+                            # Keep the last active key's action
+                            last_key = list(pressed_keys)[-1]
+                            action, cmd = key_map[last_key]
+                            self.current_action = action
+                            self.ser.write(cmd)
+                            
         except Exception as e:
             print(f"Keyboard thread error: {e}")
 
@@ -217,7 +297,7 @@ class DataRecorder:
         # Initialize with first frame
         global TERMINATE
         frames = self.pipeline.wait_for_frames()
-        first_frame = self.process_frame(frames)
+        first_frame = self.frame_processing(self.process_frame(frames))
         if first_frame is None:
             raise ValueError("Camera initialization failed")
         self.frame_stack.reset(first_frame)
@@ -230,7 +310,7 @@ class DataRecorder:
            
             while not TERMINATE:
                 frames = self.pipeline.wait_for_frames()
-                current_frame = self.process_frame(frames)
+                current_frame = self.frame_processing(self.process_frame(frames))
                
                 if current_frame is None:
                     continue
@@ -254,7 +334,7 @@ class DataRecorder:
                 if time.time() - start_time > 0.5:  # 0.5s timeout
                     self.current_action = 'stop'
                
-                time.sleep(0.1)  # Control frame rate
+                time.sleep(0.5)  # Control frame rate
             self.h5_file.flush()
         finally:
             self.pipeline.stop()
