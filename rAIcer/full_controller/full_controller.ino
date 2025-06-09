@@ -42,6 +42,9 @@ void loop() {
   if (Serial.available()) {
     char command = Serial.read(); // Read the command
     
+    // Clear any remaining bytes in buffer
+    while(Serial.available()) Serial.read();
+    
     // Send the received command back to Jetson for debugging
     Serial.print("Received from Jetson: ");
     Serial.println(command);
