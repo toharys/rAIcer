@@ -17,7 +17,7 @@ ARDUINO_PORTS = glob.glob('/dev/serial/by-id/*')
 KEYBOARD_PATH = "/dev/input/event2"  # Static keyboard path
 FRAME_TYPE = 'grayscale'  # 'grayscale', 'depth', or 'color'
 STACK_SIZE = 4
-SAVE_FILENAME =  "second_track_record_19.h5"
+SAVE_FILENAME =  "/media/raicer/7351-8BE8/only_line_0.h5"
 SAVE_INTERVAL = 300
 MIN_SAMPLE_INTERVAL = 0.05  # 20Hz max sample rate
 NYQUIST_MULTIPLIER = 2.5   # Sample 2.5x faster than action changes
@@ -113,7 +113,8 @@ class DataRecorder:
             shape=(0, STACK_SIZE, *frame_shape),
             maxshape=(None, STACK_SIZE, *frame_shape),
             chunks=(1, STACK_SIZE, *frame_shape),
-            dtype=np.uint8
+            dtype=np.uint8,
+            compression='lzf'
         )
         
         self.actions_dataset = self.h5_file.create_dataset(
@@ -128,7 +129,8 @@ class DataRecorder:
             shape=(0, STACK_SIZE, *frame_shape),
             maxshape=(None, STACK_SIZE, *frame_shape),
             chunks=(1, STACK_SIZE, *frame_shape),
-            dtype=np.uint8
+            dtype=np.uint8,
+            compression='lzf'
         )
 
     def process_frame(self, frames):
@@ -160,7 +162,8 @@ class DataRecorder:
             frame_gray = cv2.normalize(frame_gray, None, 0, 255, cv2.NORM_MINMAX, dtype=cv2.CV_8U)
         
         blurred = cv2.GaussianBlur(frame_gray, (5, 5), 0)
-        thresh = cv2.adaptiveThreshold(
+        """        
+	thresh = cv2.adaptiveThreshold(
             blurred,
             255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -168,8 +171,12 @@ class DataRecorder:
             11,
             2
         )
+        """
+        _, thresh = cv2.threshold(blurred, 220, 255, cv2.THRESH_BINARY)
         kernel = np.ones((3, 3), np.uint8)
-        return cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+        clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+        #edges = cv2.Canny(clean, 50, 150)
+        return clean 
 
     def handle_keyboard(self):
         """Monitor keyboard and update current action"""
