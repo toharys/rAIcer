@@ -44,7 +44,7 @@ def train_agent():
         #     bc = BehaviorCloningPolicy(in_channels=in_channels, num_actions=5)
         #     bc.load_state_dict(torch.load(bc_path))
         #     bc.eval()
-    start_chunk = 1  # todo: change it if required
+    start_chunk = 0  # todo: change it if required
     for i, fname in tqdm(enumerate(chunk_files[start_chunk:], start=start_chunk)):
         print(f"Training on chunk {i}")
 

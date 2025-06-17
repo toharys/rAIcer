@@ -3,11 +3,12 @@ import torch.nn as nn
 import numpy as np
 import torch.nn.functional as F
 import os
+import csv
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from q_networks import EnsembeleCNNQnetwork
 from behavior_cloning_policy import BehaviorCloningPolicy, train_bc_model
-# from robot_control import Robot, Action
+from rAIcer_env import Action
 from replay_buffer import ReplayBuffer
 
 SAVE_DIR = "./models/trained_agent.py"
@@ -105,7 +106,12 @@ class rAIcerAgent:
             q_target = rewards + self.gamma * q_next_max * (1 - dones)
 
         # (3) Calculate the loss
-        bellman_loss = F.mse_loss(q_sa, q_target)   # Bellman loss
+        # bellman_loss = F.mse_loss(q_sa, q_target)   # Bellman loss
+        bellman_error = (q_sa - q_target).pow(2)
+        weights = torch.ones_like(bellman_error)
+        weights[actions != Action.STOP.value] = 5.0
+
+        bellman_loss = (weights * bellman_error).mean()
 
         # KL divergence to behavior policy
         with torch.no_grad():
@@ -147,6 +153,19 @@ def plot_losses_per_chunk(chunk_index, loss_log):
     plt.savefig(f"./loss_plot_chunk_{chunk_index}.png")
     plt.close()
 
+def log_avg_losses(chunk_index, loss_log, log_file="avg_losses_per_chunk.csv"):
+    avg_total_loss = sum(loss_log["total_loss"]) / len(loss_log["total_loss"])
+    avg_bellman_loss = sum(loss_log["bellman_loss"]) / len(loss_log["bellman_loss"])
+    avg_kl_div = sum(loss_log["kl_div"]) / len(loss_log["kl_div"])
+
+    file_exists = os.path.isfile(log_file)
+
+    with open(log_file, mode='a', newline='') as f:
+        writer = csv.writer(f)
+        if not file_exists:
+            writer.writerow(["chunk_index", "avg_total_loss", "avg_bellman_loss", "avg_kl_div"])
+        writer.writerow([chunk_index, avg_total_loss, avg_bellman_loss, avg_kl_div])
+
 
 def train_rAIcer_agent_on_chunk(chunk_index, replay_buffer, bc_model, agent_checkpoint, save_path, batch_size, update_bc_model):
 
@@ -163,6 +182,7 @@ def train_rAIcer_agent_on_chunk(chunk_index, replay_buffer, bc_model, agent_chec
         agent.step_counter = checkpoint.get('step_counter', 0)
         if 'bc_model_state_dict' in checkpoint:
             agent.bc_net.load_state_dict(checkpoint['bc_model_state_dict'])
+            agent.bc_net.to(DEVICE)
 
     else:
         print(f"[Chunk {chunk_index}] Initializing new agent...")
@@ -196,7 +216,8 @@ def train_rAIcer_agent_on_chunk(chunk_index, replay_buffer, bc_model, agent_chec
             loss_log["bellman_loss"].append(losses["bellman_loss"])
             loss_log["kl_div"].append(losses["kl_div"])
 
-    plot_losses_per_chunk(chunk_index, loss_log)
+    # plot_losses_per_chunk(chunk_index, loss_log)
+    log_avg_losses(chunk_index, loss_log)
 
     torch.save({
         'q_network_state_dict': agent.q_network.state_dict(),

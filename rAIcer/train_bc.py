@@ -35,6 +35,7 @@ def train_bc():
 
         model = BehaviorCloningPolicy(in_channels, num_actions).to(DEVICE)
         model.load_state_dict(checkpoint)
+        model.to(DEVICE)
 
         print(f"✓ Loaded existing model from {BC_MODEL_PATH}")
 
@@ -49,6 +50,7 @@ def train_bc():
                 sample_state = dataset[0][0]
                 in_channels = sample_state.shape[0]
                 model = BehaviorCloningPolicy(in_channels, num_actions)
+                model.to(DEVICE)
 
             # # Load weights if checkpoint exists
             # if os.path.exists(BC_MODEL_PATH):

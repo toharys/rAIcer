@@ -6,20 +6,20 @@ from data_preprocessing import H5PyDataset, save_bc_to_h5
 from replay_buffer import ReplayBuffer
 from tqdm import tqdm
 
-DATA_DIR = "./new_samples"
+DATA_DIR = "./samples"
 OUTPUT_DIR = "./dataset"
 
 REPLAY_SAVE_PATH = "replay_buffer.pkl"
 BC_SAVE_PATH = "bc_dataset.h5"
 BUFFER_CAPACITY = 100_000
-CHUNK_SIZE = 5
+CHUNK_SIZE = 3
 
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def process_chunk(files, chunk_index):
     replay_buffer = ReplayBuffer(capacity=BUFFER_CAPACITY)
     bc_dataset = []
-
+    total_reward, total_transitions = 0.0, 0.0
     for filename in tqdm(files, desc=f"→ Chunk {chunk_index}", leave=False):
         dataset = H5PyDataset(os.path.join(DATA_DIR, filename))
         previous_action = None
@@ -48,7 +48,8 @@ def process_chunk(files, chunk_index):
             )
             bc_dataset.append((state_tensor, current_action.value))
             previous_action = current_action
-
+            total_reward += reward
+            total_transitions += 1
         dataset.close()
 
     # Save chunk
@@ -59,6 +60,7 @@ def process_chunk(files, chunk_index):
         pickle.dump(replay_buffer, f)
     save_bc_to_h5(bc_dataset, bc_path)
     print(f"✓ Saved chunk {chunk_index} → {replay_path}, {bc_path}")
+    return total_reward, total_transitions
 
 
 
@@ -104,25 +106,32 @@ def process_all_h5_files(data_dir=DATA_DIR) -> tuple[ReplayBuffer, list]:
 
 
 if __name__ == "__main__":
-    # h5_files = sorted([f for f in os.listdir(DATA_DIR) if f.endswith(".h5")])
+    h5_files = sorted([f for f in os.listdir(DATA_DIR) if f.endswith(".h5")])
     # todo ~~~~~~~~~~~~~~~~~~~~~~~~ REMOVE
-    h5_files = sorted([f for f in os.listdir(DATA_DIR) if f.endswith(".h5") and int(f.split("_")[-1].split(".")[0]) > 124])
-    print(f"Found {len(h5_files)} files.")
+    # h5_files = sorted([f for f in os.listdir(DATA_DIR) if f.endswith(".h5") and int(f.split("_")[-1].split(".")[0]) > 124])
+    # print(f"Found {len(h5_files)} files.")
+    # index = 0
 
-    for filename in h5_files:
-        index = int(filename.split("_")[-1].split(".")[0])  # Extract index from 'only_line_99.h5'
+    total_reward, total_transitions = 0.0, 0.0
+    #todo
+    # for i in range (0, len(h5_files), CHUNK_SIZE):
+    for i in range(66*CHUNK_SIZE, len(h5_files), CHUNK_SIZE):
+    # for filename in h5_files:
+        chunk_files = h5_files[i : i + CHUNK_SIZE]
+
+        # index += 1
+        # if index <= 99:
+        #     continue
         try:
-            process_chunk([filename], index)  # Pass single file and use its index for saving
+            reward, transitions = process_chunk(chunk_files, i//CHUNK_SIZE)
+            total_reward += reward
+            total_transitions += transitions
+            # process_chunk([filename], index)  # Pass single file and use its index for saving
         except OSError as e:
-            print(f"Skipping file {filename} due to error: {e}")
+            print(f"Skipping chunk {i} due to error: {e}")
+            # print(f"Skipping file {filename} due to error: {e}")
 
-    # # Process in chunks
-    # start_chunk = 0  # todo
-    # total_chunks = (len(h5_files) + CHUNK_SIZE - 1) // CHUNK_SIZE
-    # for chunk_num in range(start_chunk, total_chunks):
-    #     start_idx = chunk_num * CHUNK_SIZE
-    #     chunk_files = h5_files[start_idx:start_idx + CHUNK_SIZE]
-    #     process_chunk(chunk_files, chunk_num)
+        print(f"~~~~~~~ the avg reward was: {total_reward/total_transitions} ~~~~~~~")
 
 
 

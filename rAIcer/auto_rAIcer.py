@@ -1,11 +1,13 @@
 import os
 import torch
 from agent import rAIcerAgent
-from robot_control import Robot, Action
+#from robot_control import Robot, Action
+from robot_control_ssh_on_laptop import Robot, Action
+
 import time
 
 
-AGENT_PATH = os.path.join("./models", "trained_agent.pt")
+AGENT_PATH = os.path.join("rAIcer\models", "trained_agent.pt")
 DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
 
 
@@ -26,7 +28,8 @@ agent.q_network.eval()
 agent.target_q_network.eval()
 
 # Initialize robot
-robot = Robot()
+#robot = Robot()
+robot = Robot('10.100.102.26' , 3200)
 
 print("Robot initialized. Starting control loop...")
 
@@ -36,8 +39,12 @@ try:
         if stacked is None:
             continue
 
-        state = torch.from_numpy(stacked).float().unsqueeze(0).to(DEVICE)
+        #state = torch.from_numpy(stacked).float().unsqueeze(0).to(DEVICE)
+        state = torch.from_numpy(stacked).float().to(DEVICE)
+        state = state.squeeze(0)  # Remove extra dim if present
+
         action_idx = agent.select_action(state, mode="mean")
+        print("choseen action ", action_idx)
         action = Action(action_idx)
 
         robot.control_action(action)

@@ -3,6 +3,7 @@ import torch
 import torch.nn.functional as F
 from q_networks import CNNQnetwork
 from torch.utils.data import DataLoader
+from rAIcer_env import Action
 
 class BehaviorCloningPolicy(nn.Module):
     """
@@ -48,7 +49,12 @@ def train_bc_model(train_set, in_channels, num_actions=5, batch_size=64, num_epo
         for states, actions in train_loader:
             states, actions = states.to(device), actions.to(device).long()
             logits = bc_model(states)
-            loss = criterion(logits, actions)
+            per_sample_loss = F.cross_entropy(logits, actions, reduction='none')
+
+            weights = torch.ones_like(actions, dtype=torch.float, device=device)
+            weights[actions != Action.STOP.value] = 5.0
+
+            loss = (weights * per_sample_loss).mean()
 
             optimizer.zero_grad()
             loss.backward()

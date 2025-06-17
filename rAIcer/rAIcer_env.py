@@ -190,6 +190,11 @@ def compute_reward(frames: np.ndarray, current_action: Action, previous_action: 
         center_scores.append(c_score)
         continuity_scores.append(cont_score)
 
+        if current_action != Action.STOP:
+            reward += 1
+        else:
+            reward -= 2
+
         reward += 1.0 * cont_score
         reward += 1.0 * (1.0 - c_score)     # +1 if perfectly centered, down to 0
 
@@ -218,7 +223,7 @@ def compute_reward(frames: np.ndarray, current_action: Action, previous_action: 
     if all(cs < 0.2 for cs in center_scores) and all(s > 0.9 for s in continuity_scores):
         reward += 0.5  # small positive boost
 
-    return float(np.clip(reward, -2.0, 2.0)), False
+    return float(reward), False #float(np.clip(reward, -2.0, 2.0)), False
 
 
 

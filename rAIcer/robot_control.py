@@ -1,7 +1,7 @@
 import os
 import serial
 import glob
-from evdev import InputDevice, categorize, ecodes, list_devices
+#from evdev import InputDevice, categorize, ecodes, list_devices
 import threading
 import pyrealsense2 as rs
 import numpy as np
@@ -203,7 +203,7 @@ class Robot:
             except Exception as e:
                 print(f"Error reading from Arduino: {e}")
 
-    def control_with_keyboard(self):
+    '''def control_with_keyboard(self):
         """Monitor keyboard and update current action"""
         key_map = {
             "KEY_RIGHT": Action.RIGHT,
@@ -245,7 +245,7 @@ class Robot:
                                 self.ser.write(self.keymap[action])
                                 
         except Exception as e:
-            print(f"Keyboard thread error: {e}")
+            print(f"Keyboard thread error: {e}")'''
 
     def control_action(self, action):
         """Send command to Arduino based on action"""
