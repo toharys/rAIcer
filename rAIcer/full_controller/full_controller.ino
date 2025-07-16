@@ -37,6 +37,7 @@ void setup() {
 
 void loop() {
   // Handle motor pulse timeout
+  
   if (motorActive && millis() >= motorStopTime) {
     stopMotor();
     motorActive = false;
@@ -56,13 +57,13 @@ void loop() {
       angle += (command == 'w') ? stepSize : -stepSize;
       angle = constrain(angle, minAngle, maxAngle);
       myServo.write(angle);
-
+      Serial.println("Angle:" + String(angle));
       // Start timed forward pulse if not already active
-      if (!motorActive) {
-        moveMotor(PULSE_POWER);
-        motorStopTime = millis() + PULSE_DURATION;
-        motorActive = true;
-      }
+      //if (!motorActive) {
+      //  moveMotor(PULSE_POWER);
+      //  motorStopTime = millis() + PULSE_DURATION;
+      //  motorActive = true;
+      //}
     }
     // Direct motor control
     else if (command == 'u') {  // Forward

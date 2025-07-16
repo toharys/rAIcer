@@ -11,10 +11,10 @@ STACK_SIZE = 4
 
 class Action(Enum):
     STOP = 0
-    LEFT = 1
-    RIGHT = 2
-    FORWARD = 3
-    BACKWARD = 4
+    FORWARD = 1
+    BACKWARD = 2
+    LEFT = 3
+    RIGHT = 4
 
 class Robot:
     def __init__(self, host, port):
@@ -53,81 +53,7 @@ class Robot:
         except Exception as e:
             print(f"Error sending action: {e}")
             self.reconnect()
-    
-    ''''def get_stacked_frames(self):
-        """Receive and reconstruct stacked frames with correct dimensions"""
-        try:
-            # Request frames
-            self.socket.sendall(b"GET_STACKED_FRAMES")
 
-            # Get data size
-            size_data = self._recvall(4)
-            if not size_data:
-                return None
-            size = struct.unpack(">L", size_data)[0]
-
-            # Get serialized data
-            serialized = self._recvall(size)
-            if not serialized:
-                return None
-
-            # Deserialize list of frames
-            frames_data = pickle.loads(serialized)
-            frames = []
-
-            # Reconstruct each frame
-            for frame_bytes in frames_data:
-                frame = cv2.imdecode(
-                    np.frombuffer(frame_bytes, dtype=np.uint8), 
-                    cv2.IMREAD_GRAYSCALE if FRAME_TYPE == 'grayscale' else cv2.IMREAD_COLOR
-                )
-                if frame is not None:
-                    frames.append(frame)
-
-            # Stack into numpy array if we got all frames
-            if len(frames) == STACK_SIZE:
-                stacked = np.stack(frames, axis=0)  # Shape: [4, 120, 160]
-
-                # For grayscale - return as [1, 4, 120, 160]
-                return stacked
-            return None
-
-        except Exception as e:
-            print(f"Error receiving frames: {e}")
-            self.reconnect()
-            return None'''
-    
-    '''def get_stacked_frames(self):
-        try:
-            self.socket.sendall(b"GET_STACKED_FRAMES")
-
-            size_data = self._recvall(4)
-            if not size_data: return None
-            size = struct.unpack(">L", size_data)[0]
-
-            serialized = self._recvall(size)
-            if not serialized: return None
-
-            frames_data = pickle.loads(serialized)
-            frames = []
-
-            for frame_bytes in frames_data:
-                frame = cv2.imdecode(
-                    np.frombuffer(frame_bytes, dtype=np.uint8),
-                    cv2.IMREAD_GRAYSCALE if FRAME_TYPE == 'grayscale' else cv2.IMREAD_COLOR
-                )
-                if frame is not None:
-                    frames.append(frame)
-
-            if len(frames) == STACK_SIZE:
-                return np.stack(frames, axis=0)  # Now returns [4, 480, 640]
-            return None
-
-        except Exception as e:
-            print(f"Error receiving frames: {e}")
-            self.reconnect()
-            return None'''
-    
     def get_stacked_frames(self):
         """Request and receive frames at exactly 30Hz (33.3ms intervals)"""
         # 1. Enforce timing
@@ -174,6 +100,41 @@ class Robot:
             self.reconnect()
 
         return None
+    
+    def get_state(self):
+        """Get complete state from server (frames, angle, prev_action)"""
+        # Enforce timing
+        now = time.time()
+        elapsed = now - self.last_sample_time
+        if elapsed < self.SAMPLE_INTERVAL:
+            time.sleep(self.SAMPLE_INTERVAL - elapsed)
+
+        # Request state
+        try:
+            self.socket.sendall(b"GET_STATE")
+
+            # Get data size
+            size_data = self._recvall(4)
+            if not size_data:
+                return None
+            size = struct.unpack(">L", size_data)[0]
+
+            # Receive serialized data
+            serialized = self._recvall(size)
+            if not serialized:
+                return None
+
+            # Decode state
+            state = pickle.loads(serialized)
+            
+            # Update timing and return
+            self.last_sample_time = time.time()
+            return state
+
+        except Exception as e:
+            print(f"State receive error: {e}")
+            self.reconnect()
+            return None
     
     def calculate_sample_interval(self):
        return self.SAMPLE_INTERVAL 

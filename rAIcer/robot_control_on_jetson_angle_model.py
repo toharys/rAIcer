@@ -38,13 +38,20 @@ STACK_SIZE = 4
 SERVER_HOST = '0.0.0.0'  # Listen on all interfaces
 SERVER_PORT = 3200
 
+# class Action(Enum):
+#     STOP = 0
+#     LEFT = 1
+#     RIGHT = 2
+#     FORWARD = 3
+#     BACKWARD = 4
+
 class Action(Enum):
     STOP = 0
-    LEFT = 1
-    RIGHT = 2
-    FORWARD = 3
-    BACKWARD = 4
-
+    FORWARD = 1
+    BACKWARD = 2
+    LEFT = 3
+    RIGHT = 4
+    
 class FrameStack:
     def __init__(self, k=4):
         self.k = k
@@ -79,6 +86,8 @@ class RobotServer:
         self.last_sample_time = time.time()
         self.action_durations = []
         self.terminate = False
+        self.current_servo_angle = 0.0
+        self.prev_servo_angle = 0.0
         self.local_display = None  # Will be set based on DISPLAY environment
         self._init_display_check()
         self.keymap = {
@@ -92,7 +101,7 @@ class RobotServer:
         self.initialize_connections()
         self.configure_camera()
         self.TARGET_FPS = 30
-        self.FRAME_INTERVAL = 1.0 / self.TARGET_FPS  # 0.033s
+        self.FRAME_INTERVAL = 1.0 / self.TARGET_FPS  # 0.033s - 30Hz
         self.last_frame_time = time.time()
         # Start background threads
         self.feedback_thread = threading.Thread(target=self.read_arduino, daemon=True)
@@ -208,11 +217,30 @@ class RobotServer:
         while not self.terminate:
             try:
                 if self.ser.in_waiting > 0:
-                    data = self.ser.readline().decode('utf-8').strip()
-                    if data:
-                        print(f"Arduino: {data}")
+                    line = self.ser.readline().decode('utf-8').strip()
+                    if line.startswith('Angle:'):
+                        try:
+                            angle = float(line.split(':')[1])
+                            self.prev_servo_angle = self.current_servo_angle
+                            self.current_servo_angle = angle
+                        except (IndexError, ValueError):
+                            pass
+                    elif line:
+                        print(f"Arduino: {line}")
             except Exception as e:
                 print(f"Error reading from Arduino: {e}")
+
+    def get_current_state(self):
+        """Return the complete state dictionary"""
+        stacked_frames = self.get_stacked_frames()
+        if stacked_frames is None:
+            return None
+
+        return {
+            'image_stack': stacked_frames,
+            'servo_angle': self.prev_servo_angle,
+            'prev_action': self.previous_action.name
+        }
 
     def control_action(self, action):
         """Send command to Arduino based on action"""
@@ -221,7 +249,7 @@ class RobotServer:
             self.ser.write(self.keymap[action])
             print(f"Sending: {self.keymap[action].decode()} ({action})")
 
-    '''def get_stacked_frames(self):
+    def get_stacked_frames(self):
         """Get stacked frames from the frame stack"""
         frame = self.get_frame()
         if frame is None:
@@ -233,64 +261,39 @@ class RobotServer:
         else:
             stacked = self.frame_stack.step(frame)
             
-        return stacked'''
-    def get_stacked_frames(self):
-        """Enforce 30Hz frame sampling"""
-        now = time.time()
-        elapsed = now - self.last_frame_time
-        if elapsed < self.FRAME_INTERVAL:
-            time.sleep(self.FRAME_INTERVAL - elapsed)
-        
-        frame = self.get_frame()
-        if frame is None:
-            return None
-            
-        self.last_frame_time = time.time()  # Reset timer
-        
-        if not hasattr(self, '_first_frame_received'):
-            stacked = self.frame_stack.reset(frame)
-            self._first_frame_received = True
-        else:
-            stacked = self.frame_stack.step(frame)
-            
         return stacked
     
-    '''def send_stacked_frames(self, conn, stacked_frames):
+    
+    def send_stacked_frames(self, conn, stacked_frames):
         """Send properly formatted stacked frames"""
         if stacked_frames is None:
             return
-        
+
         try:
             # Convert frames to list of bytes
             frames_data = []
             for i in range(stacked_frames.shape[0]):
                 frame = stacked_frames[i]
-                frame = cv2.resize(frame, (160, 120))  # Resize to expected dimensions
                 _, buffer = cv2.imencode('.jpg', frame)
                 frames_data.append(buffer.tobytes())
-                
+
             # Create simple list structure (not dict)
             data = pickle.dumps(frames_data)
             conn.sendall(struct.pack(">L", len(data)) + data)
-             
-        except Exception as e:
-            print(f"Error sending frames: {e}")'''
-    def send_stacked_frames(self, conn, stacked_frames):
-        if stacked_frames is None:
-            return
-            
-        try:
-            frames_data = []
-            for i in range(stacked_frames.shape[0]):
-                frame = stacked_frames[i]
-                # Remove resize - keep original dimensions
-                _, buffer = cv2.imencode('.jpg', frame)  
-                frames_data.append(buffer.tobytes())
-                 
-            data = pickle.dumps(frames_data)
-            conn.sendall(struct.pack(">L", len(data)) + data)
+
         except Exception as e:
             print(f"Error sending frames: {e}")
+
+    def send_state(self, conn, state):
+        """Send complete state dictionary to client"""
+        if state is None:
+            return
+
+        try:
+            data = pickle.dumps(state)
+            conn.sendall(struct.pack(">L", len(data)) + data)
+        except Exception as e:
+            print(f"Error sending state: {e}")
 
     def _visualization_thread_func(self):
         """Thread for local display only"""
@@ -346,12 +349,16 @@ class RobotServer:
                         action_name = command.split(":")[1]
                         try:
                             action = Action[action_name]
+                            self.previous_action = self.current_action
                             self.control_action(action)
                         except KeyError:
                             print(f"Unknown action: {action_name}")
                     elif command == "GET_STACKED_FRAMES":
                         stacked = self.get_stacked_frames()
                         self.send_stacked_frames(conn, stacked)
+                    elif command == "GET_STATE":
+                        state = self.get_current_state()
+                        self.send_state(conn, state)
                 except ConnectionResetError:
                     break
                 except Exception as e:
